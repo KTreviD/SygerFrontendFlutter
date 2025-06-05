@@ -84,7 +84,7 @@ class _ChatPageState extends State<ChatPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:8000/generate'),
+        Uri.parse('https://syger-backend-bot.vercel.app//generate'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'prompt': text}),
       );
