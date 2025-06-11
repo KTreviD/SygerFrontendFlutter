@@ -91,6 +91,8 @@ class _ChatPageState extends State<ChatPage> {
       _messages.add(_Message(text, true));
       _controller.clear();
     });
+
+    FocusScope.of(context).requestFocus(_focusNode);
     _scrollToBottom();
 
     try {
@@ -117,8 +119,6 @@ class _ChatPageState extends State<ChatPage> {
       });
       _scrollToBottom();
     }
-
-    FocusScope.of(context).requestFocus(_focusNode);
   }
 
   void _scrollToBottom() {
