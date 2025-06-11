@@ -184,8 +184,8 @@ class _ChatPageState extends State<ChatPage> {
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _controller,
                     focusNode: _focusNode,
+                    controller: _controller,
                     decoration: const InputDecoration(
                       hintText: 'Escribe un mensaje...',
                       border: OutlineInputBorder(),
