@@ -61,6 +61,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final List<_Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -73,6 +74,18 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -81,6 +94,7 @@ class _ChatPageState extends State<ChatPage> {
       _messages.add(_Message(text, true));
       _controller.clear();
     });
+    _scrollToBottom();
 
     try {
       final response = await http.post(
@@ -104,6 +118,8 @@ class _ChatPageState extends State<ChatPage> {
         );
       });
     }
+
+    _scrollToBottom();
   }
 
   @override
@@ -121,6 +137,7 @@ class _ChatPageState extends State<ChatPage> {
       body: Column(
         children: [
           Expanded(
+            controller: _scrollController,
             child: ListView.builder(
               padding: const EdgeInsets.all(8),
               itemCount: _messages.length,
