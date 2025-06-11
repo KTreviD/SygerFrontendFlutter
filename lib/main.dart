@@ -74,18 +74,6 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -108,6 +96,7 @@ class _ChatPageState extends State<ChatPage> {
         setState(() {
           _messages.add(_Message(reply, false));
         });
+        _scrollToBottom(); // Desplázate después de un error
       } else {
         throw Exception('Error al comunicarse con el servidor');
       }
@@ -117,9 +106,18 @@ class _ChatPageState extends State<ChatPage> {
           _Message('No se pudo obtener una respuesta del servidor.', false),
         );
       });
+      _scrollToBottom(); // Desplázate después de un error
     }
+  }
 
-    _scrollToBottom();
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   @override
