@@ -62,6 +62,7 @@ class _ChatPageState extends State<ChatPage> {
   final List<_Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -72,6 +73,14 @@ class _ChatPageState extends State<ChatPage> {
         false,
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _sendMessage() async {
@@ -96,7 +105,7 @@ class _ChatPageState extends State<ChatPage> {
         setState(() {
           _messages.add(_Message(reply, false));
         });
-        _scrollToBottom(); // Desplázate después de un error
+        _scrollToBottom();
       } else {
         throw Exception('Error al comunicarse con el servidor');
       }
@@ -106,8 +115,10 @@ class _ChatPageState extends State<ChatPage> {
           _Message('No se pudo obtener una respuesta del servidor.', false),
         );
       });
-      _scrollToBottom(); // Desplázate después de un error
+      _scrollToBottom();
     }
+
+    _focusNode.requestFocus();
   }
 
   void _scrollToBottom() {
@@ -174,6 +185,7 @@ class _ChatPageState extends State<ChatPage> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    focusNode: _focusNode,
                     decoration: const InputDecoration(
                       hintText: 'Escribe un mensaje...',
                       border: OutlineInputBorder(),
