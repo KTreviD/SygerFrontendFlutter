@@ -118,7 +118,7 @@ class _ChatPageState extends State<ChatPage> {
       _scrollToBottom();
     }
 
-    _focusNode.requestFocus();
+    FocusScope.of(context).requestFocus(_focusNode);
   }
 
   void _scrollToBottom() {
