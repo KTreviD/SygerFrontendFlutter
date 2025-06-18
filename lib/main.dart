@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 
@@ -225,7 +224,6 @@ class LinkableMessage extends StatelessWidget {
             recognizer:
                 TapGestureRecognizer()
                   ..onTap = () async {
-                    // Aquí usamos el valor `url` directamente
                     if (url.contains('https://wa.me/')) {
                       await handleWhatsAppLink(url);
                     } else if (await canLaunch(url)) {
@@ -236,7 +234,7 @@ class LinkableMessage extends StatelessWidget {
                   },
           ),
         );
-        return ''; // Ignorar el contenido del enlace en texto sin formato
+        return '';
       },
       onNonMatch: (nonMatch) {
         spans.add(
@@ -245,7 +243,7 @@ class LinkableMessage extends StatelessWidget {
             style: TextStyle(color: isUser ? Colors.white : Colors.black87),
           ),
         );
-        return ''; // Mantener texto sin formato como parte del mensaje
+        return '';
       },
     );
 
@@ -270,7 +268,7 @@ Future<void> handleWhatsAppLink(String link) async {
   final match = regex.firstMatch(link);
 
   if (match != null) {
-    final phone = match.group(1); // Captura el número de teléfono
+    final phone = match.group(1);
     final fixedUrl = 'https://api.whatsapp.com/send/?phone=$phone';
 
     if (await canLaunch(fixedUrl)) {
