@@ -225,7 +225,10 @@ class LinkableMessage extends StatelessWidget {
             recognizer:
                 TapGestureRecognizer()
                   ..onTap = () async {
-                    if (await canLaunch(url)) {
+                    // Aquí usamos el valor `url` directamente
+                    if (url.contains('https://wa.me/')) {
+                      await handleWhatsAppLink(url);
+                    } else if (await canLaunch(url)) {
                       await launch(url);
                     } else {
                       throw 'No se pudo abrir el enlace: $url';
@@ -233,7 +236,7 @@ class LinkableMessage extends StatelessWidget {
                   },
           ),
         );
-        return '';
+        return ''; // Ignorar el contenido del enlace en texto sin formato
       },
       onNonMatch: (nonMatch) {
         spans.add(
@@ -242,7 +245,7 @@ class LinkableMessage extends StatelessWidget {
             style: TextStyle(color: isUser ? Colors.white : Colors.black87),
           ),
         );
-        return '';
+        return ''; // Mantener texto sin formato como parte del mensaje
       },
     );
 
@@ -259,5 +262,23 @@ class LinkableMessage extends StatelessWidget {
         child: SelectableText.rich(TextSpan(children: spans)),
       ),
     );
+  }
+}
+
+Future<void> handleWhatsAppLink(String link) async {
+  final regex = RegExp(r'https:\/\/wa\.me\/(\d+)');
+  final match = regex.firstMatch(link);
+
+  if (match != null) {
+    final phone = match.group(1); // Captura el número de teléfono
+    final fixedUrl = 'https://api.whatsapp.com/send/?phone=$phone';
+
+    if (await canLaunch(fixedUrl)) {
+      await launch(fixedUrl);
+    } else {
+      throw 'No se pudo abrir el enlace: $fixedUrl';
+    }
+  } else {
+    throw 'El enlace no es válido para WhatsApp.';
   }
 }
