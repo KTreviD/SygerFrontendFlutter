@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/gestures.dart';
 
 void main() {
   runApp(const ChatSupportApp());
@@ -154,37 +155,7 @@ class _ChatPageState extends State<ChatPage> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                return Align(
-                  alignment:
-                      msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color:
-                          msg.isUser
-                              ? const Color(0xFFD93A00)
-                              : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          msg.isUser ? Border.all(color: Colors.grey) : null,
-                    ),
-                    child: Linkify(
-                      text: msg.text,
-                      style: TextStyle(
-                        color: msg.isUser ? Colors.white : Colors.black87,
-                      ),
-                      linkStyle: const TextStyle(color: Colors.blue),
-                      onOpen: (link) async {
-                        if (await canLaunch(link.url)) {
-                          await launch(link.url);
-                        } else {
-                          throw 'No se pudo abrir el enlace: ${link.url}';
-                        }
-                      },
-                    ),
-                  ),
-                );
+                return LinkableMessage(text: msg.text, isUser: msg.isUser);
               },
             ),
           ),
@@ -226,4 +197,67 @@ class _Message {
   final bool isUser;
 
   _Message(this.text, this.isUser);
+}
+
+class LinkableMessage extends StatelessWidget {
+  final String text;
+  final bool isUser;
+
+  const LinkableMessage({Key? key, required this.text, required this.isUser})
+    : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final regex = RegExp(r'((http|https):\/\/[^\s]+)');
+    final spans = <TextSpan>[];
+
+    text.splitMapJoin(
+      regex,
+      onMatch: (match) {
+        final url = match.group(0)!;
+        spans.add(
+          TextSpan(
+            text: url,
+            style: const TextStyle(
+              color: Colors.blue,
+              decoration: TextDecoration.underline,
+            ),
+            recognizer:
+                TapGestureRecognizer()
+                  ..onTap = () async {
+                    if (await canLaunch(url)) {
+                      await launch(url);
+                    } else {
+                      throw 'No se pudo abrir el enlace: $url';
+                    }
+                  },
+          ),
+        );
+        return '';
+      },
+      onNonMatch: (nonMatch) {
+        spans.add(
+          TextSpan(
+            text: nonMatch,
+            style: TextStyle(color: isUser ? Colors.white : Colors.black87),
+          ),
+        );
+        return '';
+      },
+    );
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isUser ? const Color(0xFFD93A00) : Colors.grey[300],
+          borderRadius: BorderRadius.circular(12),
+          border: isUser ? Border.all(color: Colors.grey) : null,
+        ),
+        child: SelectableText.rich(TextSpan(children: spans)),
+      ),
+    );
+  }
 }
