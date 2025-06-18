@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'package:linkify/linkify.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const ChatSupportApp());
@@ -153,7 +154,37 @@ class _ChatPageState extends State<ChatPage> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                return buildMessage(msg);
+                return Align(
+                  alignment:
+                      msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          msg.isUser
+                              ? const Color(0xFFD93A00)
+                              : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          msg.isUser ? Border.all(color: Colors.grey) : null,
+                    ),
+                    child: Linkify(
+                      text: msg.text,
+                      style: TextStyle(
+                        color: msg.isUser ? Colors.white : Colors.black87,
+                      ),
+                      linkStyle: const TextStyle(color: Colors.blue),
+                      onOpen: (link) async {
+                        if (await canLaunch(link.url)) {
+                          await launch(link.url);
+                        } else {
+                          throw 'No se pudo abrir el enlace: ${link.url}';
+                        }
+                      },
+                    ),
+                  ),
+                );
               },
             ),
           ),
@@ -188,25 +219,6 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-}
-
-Widget buildMessage(_Message msg) {
-  return Align(
-    alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: msg.isUser ? const Color(0xFFD93A00) : Colors.grey[300],
-        borderRadius: BorderRadius.circular(12),
-        border: msg.isUser ? Border.all(color: Colors.grey) : null,
-      ),
-      child: Text(
-        msg.text,
-        style: TextStyle(color: msg.isUser ? Colors.white : Colors.black87),
-      ),
-    ),
-  );
 }
 
 class _Message {
