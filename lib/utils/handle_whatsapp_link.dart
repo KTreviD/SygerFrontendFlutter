@@ -8,8 +8,8 @@ Future<void> handleWhatsAppLink(String link) async {
     final phone = match.group(1);
     final fixedUrl = 'https://api.whatsapp.com/send/?phone=$phone';
 
-    if (await canLaunchUrl(fixedUrl as Uri)) {
-      await launchUrl(fixedUrl as Uri);
+    if (await canLaunch(fixedUrl)) {
+      await launch(fixedUrl);
     } else {
       throw 'No se pudo abrir el enlace: $fixedUrl';
     }

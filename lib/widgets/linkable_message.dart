@@ -31,8 +31,8 @@ class LinkableMessage extends StatelessWidget {
                   ..onTap = () async {
                     if (url.contains('https://wa.me/')) {
                       await handleWhatsAppLink(url);
-                    } else if (await canLaunchUrl(url as Uri)) {
-                      await launchUrl(url as Uri);
+                    } else if (await canLaunch(url)) {
+                      await launch(url);
                     } else {
                       throw 'No se pudo abrir el enlace: $url';
                     }
