@@ -26,17 +26,8 @@ class _ChatPageState extends State<ChatPage> {
       Message(
         '¡Hola! Soy tu asistente SYGER. ¿En qué puedo ayudarte hoy?',
         false,
-        options: ['Visitas', 'Pánico', 'Mi cuenta', 'Pagos'],
       ),
     );
-  }
-
-  void _handleOptionSelected(String option) {
-    setState(() {
-      _messages.add(Message(option, true));
-    });
-    _controller.text = option;
-    _sendMessage();
   }
 
   @override
@@ -116,32 +107,7 @@ class _ChatPageState extends State<ChatPage> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                if (!msg.isUser && msg.options != null) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LinkableMessage(text: msg.text, isUser: msg.isUser),
-                      Wrap(
-                        spacing: 8,
-                        children:
-                            msg.options!.map((option) {
-                              return ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryApp,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () {
-                                  _handleOptionSelected(option);
-                                },
-                                child: Text(option),
-                              );
-                            }).toList(),
-                      ),
-                    ],
-                  );
-                } else {
-                  return LinkableMessage(text: msg.text, isUser: msg.isUser);
-                }
+                return LinkableMessage(text: msg.text, isUser: msg.isUser);
               },
             ),
           ),
