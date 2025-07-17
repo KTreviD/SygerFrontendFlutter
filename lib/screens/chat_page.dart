@@ -1,6 +1,8 @@
+import 'package:chat_support_app/widgets/typing_message.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/linkable_message.dart';
 import '../models/message.dart';
@@ -13,21 +15,186 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
+// Temporal message of "Escribiendo..." have the -1 id
 class _ChatPageState extends State<ChatPage> {
   final List<Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
+  int? userId;
+
   @override
   void initState() {
     super.initState();
-    _messages.add(
-      Message(
-        '¡Hola! Soy tu asistente SYGER. ¿En qué puedo ayudarte hoy?',
-        false,
-      ),
+    _initUserId();
+  }
+
+  Future<void> _initUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedId = prefs.getInt('userId');
+
+    setState(() {
+      userId = storedId ?? _generateAndStoreUserId(prefs);
+    });
+
+    _loadConversation(); // puedes llamarla aquí si depende del userId
+  }
+
+  int _generateAndStoreUserId(SharedPreferences prefs) {
+    final newId =
+        DateTime.now()
+            .millisecondsSinceEpoch; // o usa Random().nextInt(1000000)
+    prefs.setInt('userId', newId);
+    return newId;
+  }
+
+  final List<Map<String, dynamic>> _moduleOptions = [
+    {'label': 'Noticias', 'id': 2},
+    {'label': 'Visitas', 'id': 3},
+    {'label': 'Encuestas', 'id': 4},
+    {'label': 'Reservaciones', 'id': 5},
+    {'label': 'Botón Pánico', 'id': 6},
+    {'label': 'Mi cuenta', 'id': 7},
+    {'label': 'Hablar con una persona', 'id': 8},
+  ];
+
+  final List<Map<String, dynamic>> _answerOptions = [
+    {'label': 'Sí, me fue útil', 'id': 9},
+    {'label': 'No, no me fue útil', 'id': 10},
+    {'label': 'Quiero preguntar sobre otra sección', 'id': 11},
+    {'label': 'Quiero hacer otra pregunta sobre la misma sección', 'id': 12},
+  ];
+
+  Future<void> _loadConversation() async {
+    try {
+      final uri = Uri.http('localhost:8000', '/messages/loadConversation', {
+        'userId': userId.toString(),
+      });
+      final response = await http.get(uri);
+
+      if (response.statusCode != 200) {
+        throw Exception('Error al cargar la conversación');
+      }
+
+      final json = jsonDecode(response.body);
+      final data = json['messages'] as List<dynamic>;
+
+      final loadedMessages =
+          data
+              .map((msg) {
+                try {
+                  return Message.fromJson(msg);
+                } catch (e, stacktrace) {
+                  print('❌ Error al parsear mensaje: $e');
+                  print(stacktrace);
+                  return null;
+                }
+              })
+              .whereType<Message>()
+              .toList();
+
+      setState(() {
+        if (loadedMessages.isEmpty) {
+          _messages.add(
+            Message(
+              userId,
+              false,
+              '¡Hola! Soy tu asistente SYGER, por favor escoge en qué sección de la app necesitas ayuda.',
+              1,
+            ),
+          );
+        } else {
+          _messages.addAll(loadedMessages);
+        }
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      setState(() {
+        _messages.add(
+          Message(
+            userId,
+            false,
+            'No se pudo cargar la conversación previa.',
+            0,
+          ),
+        );
+      });
+    }
+  }
+
+  bool _shouldShowOptions() {
+    if (_messages.isEmpty) return false;
+
+    final lastMessage = _messages.last;
+
+    if (lastMessage.isUser) return false;
+
+    return lastMessage.messageTypeId == 1 || lastMessage.messageTypeId == 15;
+  }
+
+  void _handleOptionSelected(Map<String, dynamic> selectedOption) {
+    _sendMessageWithPrompt(selectedOption['label'], selectedOption['id']);
+  }
+
+  Future<void> _sendMessageWithPrompt(String prompt, int messageTypeId) async {
+    FocusScope.of(context).requestFocus(_focusNode);
+    _scrollToBottom();
+
+    final newMessage = Message(userId, true, prompt, messageTypeId);
+
+    final futureResponse = http.post(
+      Uri.parse('http://localhost:8000/messages/generateAnswer'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'userMessage': newMessage, 'messages': _messages}),
     );
+
+    setState(() {
+      _messages.add(newMessage);
+      _messages.add(Message(userId, false, 'Escribiendo...', -1));
+    });
+    _scrollToBottom();
+
+    futureResponse
+        .then((response) {
+          if (response.statusCode == 200) {
+            final reply = jsonDecode(response.body)['botMessage'];
+            final botMessage = Message.fromJson(reply);
+
+            setState(() {
+              _messages.removeWhere((msg) => msg.messageTypeId == -1);
+              _messages.add(botMessage);
+            });
+          } else {
+            setState(() {
+              _messages.removeWhere((msg) => msg.messageTypeId == -1);
+              _messages.add(
+                Message(
+                  userId,
+                  false,
+                  'Error al comunicarse con el servidor.',
+                  0,
+                ),
+              );
+            });
+          }
+          _scrollToBottom();
+        })
+        .catchError((e) {
+          setState(() {
+            _messages.removeWhere((msg) => msg.messageTypeId == -1);
+            _messages.add(
+              Message(
+                userId,
+                false,
+                'No se pudo obtener una respuesta del servidor.',
+                0,
+              ),
+            );
+          });
+          _scrollToBottom();
+        });
   }
 
   @override
@@ -40,40 +207,100 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    final lastMessageTypeId = _messages[_messages.length - 1].messageTypeId;
+    int typeToSend = 0;
+
+    switch (lastMessageTypeId) {
+      case 16:
+        typeToSend = 14;
+        break;
+      case 38:
+        typeToSend = 46;
+        break;
+      case 39:
+        typeToSend = 47;
+        break;
+      case 40:
+        typeToSend = 48;
+        break;
+      case 41:
+        typeToSend = 49;
+        break;
+      case 42:
+        typeToSend = 50;
+        break;
+      case 43:
+        typeToSend = 51;
+        break;
+      default:
+        typeToSend = 0;
+    }
+    print("//////////////////////////////////////////////");
+    print(
+      "Type: ${_messages[_messages.length - 1].messageTypeId?.toString() ?? 'null'}",
+    );
+    final newMessage = Message(userId, true, text, typeToSend);
+
+    final futureResponse = http.post(
+      Uri.parse(
+        // 'https://syger-backend-bot.vercel.app/messages/generateAnswer',
+        'http://localhost:8000/messages/generateAnswer',
+      ),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'userMessage': newMessage, 'messages': _messages}),
+    );
 
     setState(() {
-      _messages.add(Message(text, true));
+      _messages.add(newMessage);
+      _messages.add(Message(userId, false, 'Escribiendo...', -1));
       _controller.clear();
     });
-
-    FocusScope.of(context).requestFocus(_focusNode);
     _scrollToBottom();
+    FocusScope.of(context).requestFocus(_focusNode);
 
-    try {
-      final response = await http.post(
-        Uri.parse('https://syger-backend-bot.vercel.app/generate'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': text}),
-      );
+    futureResponse
+        .then((response) {
+          print(response);
+          print(response.statusCode);
+          if (response.statusCode == 200) {
+            final reply = jsonDecode(response.body)['botMessage'];
+            final botMessage = Message.fromJson(reply);
 
-      if (response.statusCode == 200) {
-        final reply = jsonDecode(response.body)['response'];
-        setState(() {
-          _messages.add(Message(reply, false));
+            setState(() {
+              _messages.removeWhere((msg) => msg.messageTypeId == -1);
+              _messages.add(botMessage);
+            });
+          } else {
+            setState(() {
+              _messages.removeWhere((msg) => msg.messageTypeId == -1);
+              _messages.add(
+                Message(
+                  userId,
+                  false,
+                  'Error al comunicarse con el servidor.',
+                  0,
+                ),
+              );
+            });
+          }
+          _scrollToBottom();
+        })
+        .catchError((e) {
+          print("------------------------");
+          print(e);
+          setState(() {
+            _messages.removeWhere((msg) => msg.messageTypeId == -1);
+            _messages.add(
+              Message(
+                userId,
+                false,
+                'No se pudo obtener una respuesta del servidor.',
+                0,
+              ),
+            );
+          });
+          _scrollToBottom();
         });
-        _scrollToBottom();
-      } else {
-        throw Exception('Error al comunicarse con el servidor');
-      }
-    } catch (e) {
-      setState(() {
-        _messages.add(
-          Message('No se pudo obtener una respuesta del servidor.', false),
-        );
-      });
-      _scrollToBottom();
-    }
   }
 
   void _scrollToBottom() {
@@ -107,10 +334,38 @@ class _ChatPageState extends State<ChatPage> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                return LinkableMessage(text: msg.text, isUser: msg.isUser);
+
+                if (msg.messageTypeId == -1) {
+                  return const TypingMessage();
+                }
+
+                return LinkableMessage(text: msg.message, isUser: msg.isUser);
               },
             ),
           ),
+          if (_shouldShowOptions())
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    (_messages.last.messageTypeId == 15
+                            ? _answerOptions
+                            : _moduleOptions)
+                        .map((option) {
+                          return ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryApp,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => _handleOptionSelected(option),
+                            child: Text(option['label']),
+                          );
+                        })
+                        .toList(),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
