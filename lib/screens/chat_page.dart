@@ -38,13 +38,11 @@ class _ChatPageState extends State<ChatPage> {
       userId = storedId ?? _generateAndStoreUserId(prefs);
     });
 
-    _loadConversation(); // puedes llamarla aquí si depende del userId
+    _loadConversation();
   }
 
   int _generateAndStoreUserId(SharedPreferences prefs) {
-    final newId =
-        DateTime.now()
-            .millisecondsSinceEpoch; // o usa Random().nextInt(1000000)
+    final newId = DateTime.now().millisecondsSinceEpoch;
     prefs.setInt('userId', newId);
     return newId;
   }
@@ -68,9 +66,11 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _loadConversation() async {
     try {
-      final uri = Uri.http('localhost:8000', '/messages/loadConversation', {
-        'userId': userId.toString(),
-      });
+      final uri = Uri.https(
+        'syger-backend-bot.vercel.app',
+        '/messages/loadConversation',
+        {'userId': userId.toString()},
+      );
       final response = await http.get(uri);
 
       if (response.statusCode != 200) {
@@ -145,7 +145,7 @@ class _ChatPageState extends State<ChatPage> {
     final newMessage = Message(userId, true, prompt, messageTypeId);
 
     final futureResponse = http.post(
-      Uri.parse('http://localhost:8000/messages/generateAnswer'),
+      Uri.parse('https://syger-backend-bot.vercel.app/messages/generateAnswer'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'userMessage': newMessage, 'messages': _messages}),
     );
@@ -159,12 +159,18 @@ class _ChatPageState extends State<ChatPage> {
     futureResponse
         .then((response) {
           if (response.statusCode == 200) {
-            final reply = jsonDecode(response.body)['botMessage'];
-            final botMessage = Message.fromJson(reply);
+            final botReply = jsonDecode(response.body)['botMessage'];
+            final botMessage = Message.fromJson(botReply);
+
+            final userReply = jsonDecode(response.body)['userMessage'];
+            final userMessage = Message.fromJson(userReply);
 
             setState(() {
-              _messages.removeWhere((msg) => msg.messageTypeId == -1);
-              _messages.add(botMessage);
+              _messages.removeWhere(
+                (msg) =>
+                    msg.messageTypeId == -1 || msg.isUser && msg.id == null,
+              );
+              _messages.addAll([userMessage, botMessage]);
             });
           } else {
             setState(() {
@@ -235,17 +241,10 @@ class _ChatPageState extends State<ChatPage> {
       default:
         typeToSend = 0;
     }
-    print("//////////////////////////////////////////////");
-    print(
-      "Type: ${_messages[_messages.length - 1].messageTypeId?.toString() ?? 'null'}",
-    );
     final newMessage = Message(userId, true, text, typeToSend);
 
     final futureResponse = http.post(
-      Uri.parse(
-        // 'https://syger-backend-bot.vercel.app/messages/generateAnswer',
-        'http://localhost:8000/messages/generateAnswer',
-      ),
+      Uri.parse('https://syger-backend-bot.vercel.app/messages/generateAnswer'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'userMessage': newMessage, 'messages': _messages}),
     );
@@ -260,15 +259,19 @@ class _ChatPageState extends State<ChatPage> {
 
     futureResponse
         .then((response) {
-          print(response);
-          print(response.statusCode);
           if (response.statusCode == 200) {
-            final reply = jsonDecode(response.body)['botMessage'];
-            final botMessage = Message.fromJson(reply);
+            final botReply = jsonDecode(response.body)['botMessage'];
+            final botMessage = Message.fromJson(botReply);
+
+            final userReply = jsonDecode(response.body)['userMessage'];
+            final userMessage = Message.fromJson(userReply);
 
             setState(() {
-              _messages.removeWhere((msg) => msg.messageTypeId == -1);
-              _messages.add(botMessage);
+              _messages.removeWhere(
+                (msg) =>
+                    msg.messageTypeId == -1 || msg.isUser && msg.id == null,
+              );
+              _messages.addAll([userMessage, botMessage]);
             });
           } else {
             setState(() {
@@ -286,8 +289,6 @@ class _ChatPageState extends State<ChatPage> {
           _scrollToBottom();
         })
         .catchError((e) {
-          print("------------------------");
-          print(e);
           setState(() {
             _messages.removeWhere((msg) => msg.messageTypeId == -1);
             _messages.add(
